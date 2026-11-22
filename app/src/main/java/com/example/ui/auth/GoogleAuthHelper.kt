@@ -40,7 +40,7 @@ fun attemptAutoSignIn(
         return
     }
     val googleIdOption = GetGoogleIdOption.Builder()
-        .setFilterByAuthorizedAccounts(true)
+        .setFilterByAuthorizedAccounts(false)
         .setServerClientId(clientId)
         .setAutoSelectEnabled(true)
         .build()
