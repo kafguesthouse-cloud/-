@@ -1,0 +1,55 @@
+{
+  "project_info": {
+    "project_number": "20998677852",
+    "project_id": "gen-lang-client-0609535803",
+    "storage_bucket": "gen-lang-client-0609535803.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:20998677852:android:472bf2c4435a6df4070d99",
+        "android_client_info": {
+          "package_name": "com.aistudio.bunapos.k7m2qr"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "20998677852-dbj4pbf2ahiqjlguorgaovi5ar33u38p.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.aistudio.bunapos.k7m2qr",
+            "certificate_hash": "2ae30a046a0ff8bdcd736d331d7bcdd96332b438"
+          }
+        },
+        {
+          "client_id": "20998677852-v9sokgcse8ej492n3f79knlh97pparku.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.aistudio.bunapos.k7m2qr",
+            "certificate_hash": "c495d23d8f4c83a9edb6aa4cc19dbd856e88d270"
+          }
+        },
+        {
+          "client_id": "20998677852-j332tl8j3se5hmo06t1duq5l7vvkhfg9.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAQId-hVYSBsI9ycFNmEduiNUHIap3hrDc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "20998677852-j332tl8j3se5hmo06t1duq5l7vvkhfg9.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
