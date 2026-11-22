@@ -69,7 +69,9 @@ import com.example.data.CafeConfig
 import com.example.data.CafeRepository
 import com.example.data.LocalCafeCache
 import com.example.ui.theme.LocalPosColors
+import com.google.firebase.Firebase
 import com.google.firebase.auth.FirebaseUser
+import com.google.firebase.auth.auth
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeoutOrNull
@@ -86,8 +88,6 @@ fun AuthScreen(
     val scope = rememberCoroutineScope()
     val credentialManager = remember(context) { CredentialManager.create(context) }
 
-    // Mode 0 = Direct Gmail + App Password Login (default whenever workspace is locked/linked)
-    // Mode 1 = Initial Google Setup ("በGoogle ይግቡ")
     var selectedMode by remember(linkedUser != null && isWorkspaceLocked) {
         mutableIntStateOf(if (linkedUser != null && isWorkspaceLocked) 0 else 1)
     }
@@ -96,13 +96,10 @@ fun AuthScreen(
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
-    // Direct Login form state (ONLY Gmail + App Password)
     var gmailInput by remember { mutableStateOf("") }
     var appPasswordInput by remember { mutableStateOf("") }
     var showPassword by remember { mutableStateOf(false) }
 
-    // Only attempt silent Google auto-sign-in when there is NO locked workspace session.
-    // Never redirect to Google OAuth if the user is logging in via Direct Gmail + App Password.
     LaunchedEffect(linkedUser, isWorkspaceLocked) {
         if (linkedUser == null && !isWorkspaceLocked) {
             attemptAutoSignIn(
@@ -236,7 +233,6 @@ fun AuthScreen(
                 }
 
                 if (selectedMode == 0) {
-                    // Direct Login using ONLY Gmail + App Password (NO redirect to Google OAuth)
                     Column(
                         modifier = Modifier.fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -257,7 +253,7 @@ fun AuthScreen(
                         OutlinedTextField(
                             value = appPasswordInput,
                             onValueChange = { appPasswordInput = it.take(64) },
-                            label = { Text("App Password") },
+                            label = { Text("Password / App Password") },
                             leadingIcon = { Icon(Icons.Filled.Key, contentDescription = null) },
                             trailingIcon = {
                                 IconButton(onClick = { showPassword = !showPassword }) {
@@ -285,15 +281,7 @@ fun AuthScreen(
                                     return@Button
                                 }
                                 if (enteredPassword.isEmpty()) {
-                                    errorMessage = "App Password ያስገቡ (Enter your App Password)"
-                                    return@Button
-                                }
-
-                                // Do NOT redirect to Google OAuth here. Verify against linked workspace.
-                                if (linkedUser == null) {
-                                    errorMessage = "ይህ ስልክ/ታብሌት ከካፌው Workspace ጋር ገና አልተገናኘም። " +
-                                        "መጀመሪያ 'Google ማገናኛ' የሚለውን በመንካት አንድ ጊዜ የGoogle አካውንቱን ያገናኙ " +
-                                        "(Firebase Email/Password ካልተከፈተ በቀር)።"
+                                    errorMessage = "Password ያስገቡ (Enter your Password)"
                                     return@Button
                                 }
 
@@ -301,51 +289,51 @@ fun AuthScreen(
                                 errorMessage = null
                                 scope.launch {
                                     try {
-                                        val remoteConfig = withTimeoutOrNull(1800L) {
-                                            val db = CafeRepository.createConfiguredFirestore(context)
-                                            val snap = db.collection("users")
-                                                .document(linkedUser.uid)
-                                                .collection("config")
-                                                .document("settings")
-                                                .get()
-                                                .await()
-                                            val cfg = snap.toObject(CafeConfig::class.java)
-                                            if (cfg != null) {
-                                                LocalCafeCache(context.applicationContext).saveConfig(linkedUser.uid, cfg)
+                                        if (linkedUser != null) {
+                                            val remoteConfig = withTimeoutOrNull(1800L) {
+                                                val db = CafeRepository.createConfiguredFirestore(context)
+                                                val snap = db.collection("users")
+                                                    .document(linkedUser.uid)
+                                                    .collection("config")
+                                                    .document("settings")
+                                                    .get()
+                                                    .await()
+                                                val cfg = snap.toObject(CafeConfig::class.java)
+                                                if (cfg != null) {
+                                                    LocalCafeCache(context.applicationContext).saveConfig(linkedUser.uid, cfg)
+                                                }
+                                                cfg
                                             }
-                                            cfg
-                                        }
-                                        val effectiveConfig = remoteConfig ?: cachedConfig
-                                        if (effectiveConfig == null || !effectiveConfig.appPasswordSet) {
-                                            errorMessage = "ለዚህ Workspace App Password ገና አልተፈጠረም። መጀመሪያ በGoogle ይግቡና በሴቲንግ ውስጥ App Password ያዘጋጁ።"
-                                            isLoading = false
-                                            return@launch
+                                            val effectiveConfig = remoteConfig ?: cachedConfig
+                                            if (effectiveConfig != null && effectiveConfig.appPasswordSet) {
+                                                val expectedEmail = effectiveConfig.linkedEmail
+                                                    .ifBlank { linkedUser.email ?: "" }
+                                                    .trim()
+                                                    .lowercase()
+                                                val emailMatches = expectedEmail.isNotEmpty() && enteredEmail == expectedEmail
+                                                val passwordMatches = AppPasswordCrypto.verifyAppPassword(
+                                                    password = enteredPassword,
+                                                    saltHex = effectiveConfig.appPasswordSalt,
+                                                    storedHash = effectiveConfig.appPasswordHash
+                                                )
+                                                if (emailMatches && passwordMatches) {
+                                                    onUnlockWithPassword(linkedUser.uid)
+                                                    appPasswordInput = ""
+                                                    isLoading = false
+                                                    onAuthSuccess()
+                                                    return@launch
+                                                }
+                                            }
                                         }
 
-                                        val expectedEmail = effectiveConfig.linkedEmail
-                                            .ifBlank { linkedUser.email ?: "" }
-                                            .trim()
-                                            .lowercase()
-
-                                        val emailMatches = expectedEmail.isNotEmpty() && enteredEmail == expectedEmail
-                                        val passwordMatches = AppPasswordCrypto.verifyAppPassword(
-                                            password = enteredPassword,
-                                            saltHex = effectiveConfig.appPasswordSalt,
-                                            storedHash = effectiveConfig.appPasswordHash
-                                        )
-
-                                        if (emailMatches && passwordMatches) {
-                                            onUnlockWithPassword(linkedUser.uid)
-                                            appPasswordInput = ""
-                                            isLoading = false
-                                            onAuthSuccess()
-                                        } else {
-                                            isLoading = false
-                                            errorMessage = "Gmail ወይም App Password አልተዛመደም • Incorrect Gmail or App Password"
-                                        }
+                                        Firebase.auth.signInWithEmailAndPassword(enteredEmail, enteredPassword).await()
+                                        appPasswordInput = ""
+                                        isLoading = false
+                                        onAuthSuccess()
                                     } catch (e: Exception) {
                                         isLoading = false
-                                        errorMessage = e.localizedMessage ?: "Login failed"
+                                        errorMessage = e.localizedMessage
+                                            ?: "Gmail ወይም Password አልተዛመደም • Incorrect Gmail or Password"
                                     }
                                 }
                             },
@@ -399,7 +387,6 @@ fun AuthScreen(
                         }
                     }
                 } else {
-                    // Initial Google Account Setup / Workspace Verification
                     Surface(
                         shape = RoundedCornerShape(16.dp),
                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
@@ -411,11 +398,11 @@ fun AuthScreen(
                         ) {
                             FeatureRow(
                                 icon = Icons.Filled.Sync,
-                                text = "መጀመሪያ የካፌውን Workspace እና Gmail ለማረጋገጥ በGoogle ይግቡ"
+                                text = "በFirebase የተከፈተ Gmail እና Password በቀጥታ መጠቀም ይችላሉ"
                             )
                             FeatureRow(
                                 icon = Icons.Filled.Key,
-                                text = "ከዚያ በኋላ ለሚመጡ መግቢያዎች App Password በመፍጠር በቀጥታ ይግቡ"
+                                text = "Workspace ከተገናኘ በኋላ App Password መፍጠር ይቻላል"
                             )
                             FeatureRow(
                                 icon = Icons.AutoMirrored.Filled.ReceiptLong,
