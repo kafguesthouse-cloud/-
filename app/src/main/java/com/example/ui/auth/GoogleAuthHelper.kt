@@ -33,32 +33,42 @@ fun attemptAutoSignIn(
         onAuthSuccess()
         return
     }
+
     val clientId = try {
         context.getString(R.string.default_web_client_id)
-    } catch (_: Exception) {
+    } catch (e: Exception) {
+        Log.e("Auth", "Missing default_web_client_id in auto sign-in", e)
         onUnauthenticated()
         return
     }
+
     val googleIdOption = GetGoogleIdOption.Builder()
         .setFilterByAuthorizedAccounts(false)
         .setServerClientId(clientId)
-        .setAutoSelectEnabled(true)
+        .setAutoSelectEnabled(false)
         .build()
+
     val request = GetCredentialRequest.Builder()
         .addCredentialOption(googleIdOption)
         .build()
 
     scope.launch {
         try {
-            val cred = credentialManager.getCredential(context, request).credential
+            val activityContext = context as? Activity ?: context
+            val cred = credentialManager.getCredential(activityContext, request).credential
             if (cred is CustomCredential && cred.type == TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
                 val token = GoogleIdTokenCredential.createFrom(cred.data).idToken
                 Firebase.auth.signInWithCredential(GoogleAuthProvider.getCredential(token, null)).await()
                 onAuthSuccess()
             } else {
+                Log.w("Auth", "Auto sign-in: unexpected credential type ${cred::class.java.simpleName}")
                 onUnauthenticated()
             }
-        } catch (_: Exception) {
+        } catch (e: GetCredentialCancellationException) {
+            Log.w("Auth", "Auto sign-in cancelled: ${e.message}", e)
+            onUnauthenticated()
+        } catch (e: Exception) {
+            Log.e("Auth", "Auto sign-in failed: ${e.localizedMessage}", e)
             onUnauthenticated()
         }
     }
@@ -74,10 +84,12 @@ fun onGoogleSignInClicked(
 ) {
     val clientId = try {
         context.getString(R.string.default_web_client_id)
-    } catch (_: Exception) {
+    } catch (e: Exception) {
+        Log.e("Auth", "Missing default_web_client_id", e)
         onAuthError("Google Sign-In configuration missing: default_web_client_id not found")
         return
     }
+
     val signInOption = GetSignInWithGoogleOption.Builder(serverClientId = clientId).build()
     val request = GetCredentialRequest.Builder()
         .addCredentialOption(signInOption)
@@ -92,14 +104,18 @@ fun onGoogleSignInClicked(
                 Firebase.auth.signInWithCredential(GoogleAuthProvider.getCredential(token, null)).await()
                 onAuthSuccess()
             } else {
-                onAuthError("Unexpected credential type")
+                val typeName = cred::class.java.simpleName
+                onAuthError("Unexpected credential type: $typeName")
             }
         } catch (e: GetCredentialCancellationException) {
-            Log.w("Auth", "Google Sign-In flow cancelled or dismissed: ${e.message}", e)
-            onAuthCancelled()
+            val reason = e.message ?: e.localizedMessage ?: "Cancelled"
+            Log.w("Auth", "Google Sign-In flow cancelled or dismissed: $reason", e)
+            onAuthError("Google Sign-In cancelled/dismissed: $reason")
         } catch (e: Exception) {
-            Log.e("Auth", "Google Sign-In failed", e)
-            onAuthError(e.localizedMessage ?: "Sign in failed")
+            val errName = e::class.java.simpleName
+            val detail = e.localizedMessage ?: e.message ?: "Unknown error"
+            Log.e("Auth", "Google Sign-In failed ($errName): $detail", e)
+            onAuthError("$errName: $detail")
         }
     }
 }
