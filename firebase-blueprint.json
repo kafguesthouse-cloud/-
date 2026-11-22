@@ -1,0 +1,214 @@
+{
+  "entities": {
+    "CafeConfig": {
+      "title": "CafeConfig",
+      "description": "Shared cafe workspace configuration including role PINs, 78->79 alias toggle, staff list, and daily ticket sequence counter.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Owner Firebase Auth UID."
+        },
+        "cashierPin": {
+          "type": "string",
+          "description": "4 to 8 digit PIN locking the Cashier view."
+        },
+        "ticketerPin": {
+          "type": "string",
+          "description": "4 to 8 digit PIN locking the Ticketer view."
+        },
+        "pinsCustomized": {
+          "type": "boolean",
+          "description": "Whether the user has customized the initial default PINs."
+        },
+        "alias78To79": {
+          "type": "boolean",
+          "description": "When true, entering menu code 78 maps to the item configured at 79."
+        },
+        "staff": {
+          "type": "array",
+          "description": "Ordered list of waiter/staff names selectable when sending a ticket."
+        },
+        "nextTicketSeq": {
+          "type": "integer",
+          "description": "Next sequential ticket number for the current day."
+        },
+        "lastTicketDay": {
+          "type": "string",
+          "description": "YYYY-MM-DD key for the last issued ticket number."
+        },
+        "dayEpoch": {
+          "type": "integer",
+          "description": "Resettable daily session epoch incremented on Start New Day while preserving prior history."
+        },
+        "linkedEmail": {
+          "type": "string",
+          "description": "Verified Gmail address linked to the cafe workspace."
+        },
+        "appPasswordHash": {
+          "type": "string",
+          "description": "Salted PBKDF2 hash of the dedicated workspace App Password."
+        },
+        "appPasswordSalt": {
+          "type": "string",
+          "description": "Random hex salt paired with appPasswordHash."
+        },
+        "appPasswordSet": {
+          "type": "boolean",
+          "description": "True when the cafe workspace has an active App Password."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp (FieldValue.serverTimestamp()) when config was created."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp (FieldValue.serverTimestamp()) of last config update."
+        }
+      },
+      "required": [
+        "userId",
+        "cashierPin",
+        "ticketerPin",
+        "pinsCustomized",
+        "alias78To79",
+        "staff",
+        "nextTicketSeq",
+        "lastTicketDay",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "MenuItem": {
+      "title": "MenuItem",
+      "description": "Cafe menu item mapped to a numeric code from 1 to 1000.",
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "description": "Numeric menu code between 1 and 1000."
+        },
+        "name": {
+          "type": "string",
+          "description": "Amharic or English display name of the menu item."
+        },
+        "price": {
+          "type": "number",
+          "description": "Unit price in ETB."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp (FieldValue.serverTimestamp()) when menu item was created."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp (FieldValue.serverTimestamp()) of last menu item update."
+        }
+      },
+      "required": [
+        "code",
+        "name",
+        "price",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "CafeOrder": {
+      "title": "CafeOrder",
+      "description": "Minimal low-bandwidth order ticket dispatched from Cashier to Ticketer.",
+      "type": "object",
+      "properties": {
+        "ticketNumber": {
+          "type": "integer",
+          "description": "Daily sequential ticket number."
+        },
+        "dayKey": {
+          "type": "string",
+          "description": "Local date string YYYY-MM-DD for fast daily filtering."
+        },
+        "dayEpoch": {
+          "type": "integer",
+          "description": "Active day session epoch when the order was created."
+        },
+        "staffName": {
+          "type": "string",
+          "description": "Selected waiter/staff member name."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["PENDING", "COMPLETED", "RETURNED"],
+          "description": "Current order lifecycle state."
+        },
+        "items": {
+          "type": "array",
+          "description": "Compact list of line item maps {c, n, q, p} with snapshotted price p."
+        },
+        "totalAmount": {
+          "type": "number",
+          "description": "Total ticket price in ETB based on snapshotted item prices."
+        },
+        "unpaid": {
+          "type": "boolean",
+          "description": "True when the order was sent as unpaid (ያልተከፈለ) until marked paid (ተከፍሏል)."
+        },
+        "urgent": {
+          "type": "boolean",
+          "description": "True when marked Urgent / ቅድሚያ."
+        },
+        "note": {
+          "type": "string",
+          "description": "Optional short order note (max 15 characters)."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp (FieldValue.serverTimestamp()) when ticket was sent."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp (FieldValue.serverTimestamp()) of last state update."
+        },
+        "completedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp (FieldValue.serverTimestamp()) when completed or returned."
+        },
+        "paidAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp (FieldValue.serverTimestamp()) when an unpaid order is marked paid."
+        }
+      },
+      "required": [
+        "ticketNumber",
+        "dayKey",
+        "staffName",
+        "status",
+        "items",
+        "totalAmount",
+        "unpaid",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/config/{configId}": {
+      "schema": { "$ref": "#/entities/CafeConfig" },
+      "description": "Workspace settings document (settings) owned by the signed-in Google account."
+    },
+    "/users/{userId}/menuItems/{codeId}": {
+      "schema": { "$ref": "#/entities/MenuItem" },
+      "description": "Numeric menu items (1-1000) owned by the signed-in Google account."
+    },
+    "/users/{userId}/orders/{orderId}": {
+      "schema": { "$ref": "#/entities/CafeOrder" },
+      "description": "Real-time cafe order tickets shared between Cashier and Ticketer."
+    }
+  }
+}
